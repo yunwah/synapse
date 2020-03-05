@@ -133,7 +133,6 @@ class RoomKeysServlet(RestServlet):
 
         logger.info(user_id)
         logger.info(version)
-        logger.info(body)
 
         ret = await self.e2e_room_keys_handler.upload_room_keys(user_id, version, body)
         return 200, ret
