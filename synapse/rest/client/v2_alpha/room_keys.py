@@ -131,6 +131,10 @@ class RoomKeysServlet(RestServlet):
         if room_id:
             body = {"rooms": {room_id: body}}
 
+        logger.info(user_id)
+        logger.info(version)
+        logger.info(body)
+
         ret = await self.e2e_room_keys_handler.upload_room_keys(user_id, version, body)
         return 200, ret
 
@@ -376,9 +380,6 @@ class RoomKeysVersionServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         info = parse_json_object_from_request(request)
-        logger.info(user_id)
-        logger.info(version)
-        logger.info(info)
 
         if version is None:
             raise SynapseError(
