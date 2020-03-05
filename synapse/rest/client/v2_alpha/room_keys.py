@@ -376,6 +376,9 @@ class RoomKeysVersionServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         info = parse_json_object_from_request(request)
+        logger.info(user_id)
+        logger.info(version)
+        logger.info(info)
 
         if version is None:
             raise SynapseError(
