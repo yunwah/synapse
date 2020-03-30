@@ -334,18 +334,28 @@ class RegistrationConfig(Config):
             #email: https://example.com     # Delegate email sending to example.com
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
-        # If disabled, don't let users set their own display names/avatars
-        # (unless they are a server admin) other than for the very first time.
-        # Useful when provisioning users based on the contents of a 3rd party
-        # directory and to avoid ambiguities.
+        # Whether users are allowed to change their displayname after it has
+        # been initially set. Useful when provisioning users based on the
+        # contents of a third-party directory.
         #
-        #enable_set_displayname: true
-        #enable_set_avatar_url: true
+        # Does not apply to server administrators. Defaults to 'true'
+        #
+        #enable_set_displayname: false
 
-        # If false, stop users from trying to change the 3PIDs associated with
-        # their accounts.
+        # Whether users are allowed to change their avatar after it has been
+        # initially set. Useful when provisioning users based on the contents
+        # of a third-party directory.
         #
-        #enable_3pid_changes: true
+        # Does not apply to server administrators. Defaults to 'true'
+        #
+        #enable_set_avatar_url: false
+
+        # Whether users can change the 3PIDs associated with their accounts
+        # (email address and msisdn).
+        #
+        # Defaults to 'true'
+        #
+        #enable_3pid_changes: false
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
