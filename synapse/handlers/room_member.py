@@ -396,7 +396,7 @@ class RoomMemberHandler(object):
         current_state_ids = yield self.state_handler.get_current_state_ids(
             room_id, latest_event_ids=latest_event_ids
         )
-        
+
         logger.info("handlers-room_member:386")
 
         # TODO: Refactor into dictionary of explicitly allowed transitions
