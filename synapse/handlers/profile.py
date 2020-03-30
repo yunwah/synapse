@@ -182,6 +182,8 @@ class BaseProfileHandler(BaseHandler):
 
         yield self.store.set_profile_displayname(target_user.localpart, new_displayname)
 
+        logger.info("handlers-profile:185")
+
         if self.hs.config.user_directory_search_all_users:
             profile = yield self.store.get_profileinfo(target_user.localpart)
             yield self.user_directory_handler.handle_local_profile_change(
@@ -284,6 +286,8 @@ class BaseProfileHandler(BaseHandler):
         if not self.hs.is_mine(target_user):
             return
 
+        logger.info("handlers-profile:289")
+
         yield self.ratelimit(requester)
 
         room_ids = yield self.store.get_rooms_for_user(target_user.to_string())
@@ -293,6 +297,8 @@ class BaseProfileHandler(BaseHandler):
             try:
                 # Assume the target_user isn't a guest,
                 # because we don't let guests set profile or avatar data.
+                logger.info("handlers-profile:300")
+
                 yield handler.update_membership(
                     requester,
                     target_user,

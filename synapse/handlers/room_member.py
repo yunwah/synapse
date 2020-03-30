@@ -164,6 +164,8 @@ class RoomMemberHandler(object):
         if requester.is_guest:
             content["kind"] = "guest"
 
+        logger.info("handlers-room_member:167")
+
         event, context = yield self.event_creation_handler.create_event(
             requester,
             {
@@ -181,6 +183,8 @@ class RoomMemberHandler(object):
             require_consent=require_consent,
         )
 
+        logger.info("handlers-room_member:186")
+
         # Check if this event matches the previous membership event for the user.
         duplicate = yield self.event_creation_handler.deduplicate_state_event(
             event, context
@@ -197,21 +201,31 @@ class RoomMemberHandler(object):
 
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
 
+        logger.info("handlers-room_member:204")
+
         if event.membership == Membership.JOIN:
+            logger.info("handlers-room_member:207")
+
             # Only fire user_joined_room if the user has actually joined the
             # room. Don't bother if the user is just changing their profile
             # info.
             newly_joined = True
             if prev_member_event_id:
+                logger.info("handlers-room_member:214")
+
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
+                logger.info("handlers-room_member:219")
+
                 yield self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = yield self.store.get_event(prev_member_event_id)
                 if prev_member_event.membership == Membership.JOIN:
                     yield self._user_left_room(target, room_id)
+
+        logger.info("handlers-room_member:228")
 
         return event
 
@@ -268,6 +282,7 @@ class RoomMemberHandler(object):
         require_consent=True,
     ):
         key = (room_id,)
+        logger.info("handlers-room_member:271")
 
         with (yield self.member_linearizer.queue(key)):
             result = yield self._update_membership(
@@ -318,6 +333,8 @@ class RoomMemberHandler(object):
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
 
+        logger.info("handlers-room_member:322")
+
         # if this is a join with a 3pid signature, we may need to turn a 3pid
         # invite into a normal invite before we can handle the join.
         if third_party_signed is not None:
@@ -335,6 +352,8 @@ class RoomMemberHandler(object):
             is_blocked = yield self.store.is_room_blocked(room_id)
             if is_blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
+
+        logger.info("handlers-room_member:342")
 
         if effective_membership_state == Membership.INVITE:
             # block any attempts to invite the server notices mxid
@@ -370,17 +389,23 @@ class RoomMemberHandler(object):
             if block_invite:
                 raise SynapseError(403, "Invites have been disabled on this server")
 
+        logger.info("handlers-room_member:378")
+
         latest_event_ids = yield self.store.get_prev_events_for_room(room_id)
 
         current_state_ids = yield self.state_handler.get_current_state_ids(
             room_id, latest_event_ids=latest_event_ids
         )
+        
+        logger.info("handlers-room_member:386")
 
         # TODO: Refactor into dictionary of explicitly allowed transitions
         # between old and new state, with specific error messages for some
         # transitions and generic otherwise
         old_state_id = current_state_ids.get((EventTypes.Member, target.to_string()))
         if old_state_id:
+            logger.info("handlers-room_member:393")
+
             old_state = yield self.store.get_event(old_state_id, allow_none=True)
             old_membership = old_state.content.get("membership") if old_state else None
             if action == "unban" and old_membership != "ban":
@@ -396,6 +421,7 @@ class RoomMemberHandler(object):
                     "Cannot %s user who was banned" % (action,),
                     errcode=Codes.BAD_STATE,
                 )
+            logger.info("handlers-room_member:410")
 
             if old_state:
                 same_content = content == old_state.content
@@ -403,6 +429,8 @@ class RoomMemberHandler(object):
                 same_sender = requester.user.to_string() == old_state.sender
                 if same_sender and same_membership and same_content:
                     return old_state
+
+            logger.info("handlers-room_member:419")
 
             if old_membership in ["ban", "leave"] and action == "kick":
                 raise AuthError(403, "The target user is not in the room")
@@ -420,13 +448,20 @@ class RoomMemberHandler(object):
                         "You cannot reject this invite",
                         errcode=Codes.CANNOT_LEAVE_SERVER_NOTICE_ROOM,
                     )
+
+            logger.info("handlers-room_member:438")
+
         else:
             if action == "kick":
                 raise AuthError(403, "The target user is not in the room")
 
         is_host_in_room = yield self._is_host_in_room(current_state_ids)
 
+        logger.info("handlers-room_member:446")
+
         if effective_membership_state == Membership.JOIN:
+            logger.info("handlers-room_member:449")
+
             if requester.is_guest:
                 guest_can_join = yield self._can_guest_join(current_state_ids)
                 if not guest_can_join:
@@ -455,6 +490,8 @@ class RoomMemberHandler(object):
 
                 return remote_join_response
 
+            logger.info("handlers-room_member:479")
+
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
                 # perhaps we've been invited
@@ -476,6 +513,8 @@ class RoomMemberHandler(object):
                         requester, remote_room_hosts, room_id, target, content,
                     )
                     return res
+
+        logger.info("handlers-room_member:503")
 
         res = yield self._local_membership_update(
             requester=requester,
