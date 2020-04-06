@@ -23,6 +23,7 @@ from twisted.internet import defer
 
 import synapse
 from synapse.api.constants import EventTypes
+from synapse.api.errors import CodeMessageException
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics import (
     event_processing_loop_counter,
@@ -196,6 +197,31 @@ class ApplicationServicesHandler(object):
                 # the alias exists now so don't query more ASes.
                 result = yield self.store.get_association_from_room_alias(room_alias)
                 return result
+
+    @defer.inlineCallbacks
+    def forward_erasure_request(self, user_id):
+        # Get all of the app services. We don't filter out services that don't share a
+        # room with the user, because they might have done so in the past and still
+        # retain some data related to the user.
+        services = self.store.get_app_services()
+
+        for service in services:
+            try:
+                yield self.appservice_api.forward_erasure_request(service, user_id)
+            except CodeMessageException as e:
+                logger.warning(
+                    "Could not forward erasure request to app service %s: responded "
+                    "with code %s",
+                    service.url,
+                    e.code,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Could not forward erasure request to app service %s because of "
+                    "exception: %s",
+                    service.url,
+                    e
+                )
 
     @defer.inlineCallbacks
     def query_3pe(self, kind, protocol, fields):

@@ -238,3 +238,8 @@ class ApplicationServiceApi(SimpleHttpClient):
     def _serialize(self, events):
         time_now = self.clock.time_msec()
         return [serialize_event(e, time_now, as_client_event=True) for e in events]
+
+    @defer.inlineCallbacks
+    def forward_erasure_request(self, service, user_id):
+        uri = service.url + "/users/erase"
+        yield self.post_json_get_json(uri=uri, post_json={"user_id": user_id})
