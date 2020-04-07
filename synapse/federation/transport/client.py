@@ -962,6 +962,14 @@ class TransportLayerClient(object):
 
         return self.client.get_json(destination=destination, path=path)
 
+    def forward_erasure_request(self, destination, user_id):
+        path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/user/erase")
+        content = {"user_id": user_id}
+
+        return self.client.post_json(
+            destination=destination, path=path, content=content,
+        )
+
 
 def _create_path(federation_prefix, path, *args):
     """
