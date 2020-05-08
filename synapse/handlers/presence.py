@@ -676,13 +676,15 @@ class PresenceHandler(BasePresenceHandler):
     async def incoming_presence(self, origin, content):
         """Called when we receive a `m.presence` EDU from a remote server.
         """
+        # Ignore presence updates if presence is disabled
+        if not self.hs.config.use_presence:
+            return
+
         now = self.clock.time_msec()
         updates = []
         for push in content.get("push", []):
             # A "push" contains a list of presence that we are probably interested
             # in.
-            # TODO: Actually check if we're interested, rather than blindly
-            # accepting presence updates.
             user_id = push.get("user_id", None)
             if not user_id:
                 logger.info(

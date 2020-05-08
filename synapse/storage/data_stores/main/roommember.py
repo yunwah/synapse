@@ -163,7 +163,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         hosts = frozenset(get_domain_from_id(user_id) for user_id in user_ids)
         return hosts
 
-    @cached(max_entries=300000, iterable=True)
+    @cached(max_entries=250000, iterable=True)
     def get_users_in_room(self, room_id):
         return self.db.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
