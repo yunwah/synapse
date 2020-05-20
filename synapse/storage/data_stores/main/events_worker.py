@@ -609,7 +609,8 @@ class EventsWorkerStore(SQLBaseStore):
                         d["room_id"],
                         room_version_id,
                     )
-                    continue
+                    room_version = KNOWN_ROOM_VERSIONS.get("2")
+                    #continue
 
                 if room_version.event_format != format_version:
                     logger.error(
