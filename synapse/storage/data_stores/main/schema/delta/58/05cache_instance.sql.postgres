@@ -13,16 +13,18 @@
  * limitations under the License.
  */
 
--- register a background update which will create a unique index on
--- device_lists_outbound_last_success
-INSERT into background_updates (ordering, update_name, progress_json)
-    VALUES (5804, 'device_lists_outbound_last_success_unique_idx', '{}');
+-- We keep the old table here to enable us to roll back. It doesn't matter
+-- that we have dropped all the data here.
+TRUNCATE cache_invalidation_stream;
 
--- once that completes, we can drop the old index.
-INSERT into background_updates (ordering, update_name, progress_json, depends_on)
-    VALUES (
-        5804,
-        'drop_device_lists_outbound_last_success_non_unique_idx',
-        '{}',
-        'device_lists_outbound_last_success_unique_idx'
-    );
+CREATE TABLE cache_invalidation_stream_by_instance (
+    stream_id       BIGINT NOT NULL,
+    instance_name   TEXT NOT NULL,
+    cache_func      TEXT NOT NULL,
+    keys            TEXT[],
+    invalidation_ts BIGINT
+);
+
+CREATE UNIQUE INDEX cache_invalidation_stream_by_instance_id ON cache_invalidation_stream_by_instance(stream_id);
+
+CREATE SEQUENCE cache_invalidation_stream_seq;
