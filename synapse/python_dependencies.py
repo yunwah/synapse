@@ -81,14 +81,6 @@ CONDITIONAL_REQUIREMENTS = {
     "postgres": ["psycopg2>=2.7"],
     # ConsentResource uses select_autoescape, which arrived in jinja 2.9
     "resources.consent": ["Jinja2>=2.9"],
-    # ACME support is required to provision TLS certificates from authorities
-    # that use the protocol, such as Let's Encrypt.
-    "acme": [
-        "txacme>=0.9.2",
-        # txacme depends on eliot. Eliot 1.8.0 is incompatible with
-        # python 3.5.2, as per https://github.com/itamarst/eliot/issues/418
-        'eliot<1.8.0;python_version<"3.5.3"',
-    ],
     "saml2": ["pysaml2>=4.5.0"],
     "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],

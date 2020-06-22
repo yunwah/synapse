@@ -53,7 +53,6 @@ from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionR
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers import Handlers
 from synapse.handlers.account_validity import AccountValidityHandler
-from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
 from synapse.handlers.cas_handler import CasHandler
@@ -150,7 +149,6 @@ class HomeServer(object):
         "sync_handler",
         "typing_handler",
         "room_list_handler",
-        "acme_handler",
         "auth_handler",
         "device_handler",
         "stats_handler",
@@ -396,9 +394,6 @@ class HomeServer(object):
 
     def build_e2e_room_keys_handler(self):
         return E2eRoomKeysHandler(self)
-
-    def build_acme_handler(self):
-        return AcmeHandler(self)
 
     def build_application_service_api(self):
         return ApplicationServiceApi(self)
