@@ -25,7 +25,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
-from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
+from canonicaljson import encode_canonical_json, encode_pretty_printed_json
 
 from twisted.internet import defer
 from twisted.python import failure
@@ -46,6 +46,7 @@ from synapse.api.errors import (
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import preserve_fn
 from synapse.logging.opentracing import trace_servlet
+from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 
 logger = logging.getLogger(__name__)
@@ -217,7 +218,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         return NOT_DONE_YET
 
     @wrap_async_request_handler
-    async def _async_render_wrapper(self, request):
+    async def _async_render_wrapper(self, request: SynapseRequest):
         """This is a wrapper that delegates to `_async_render` and handles
         exceptions, return values, metrics, etc.
         """
@@ -237,15 +238,17 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             f = failure.Failure()
             self._send_error_response(f, request)
 
-    async def _async_render(self, request):
+    async def _async_render(self, request: Request):
         """Delegates to `_async_render_<METHOD>` methods, or returns a 400 if
         no appropriate method exists. Can be overriden in sub classes for
         different routing.
         """
+        # Treat HEAD requests as GET requests.
+        request_method = request.method.decode("ascii")
+        if request_method == "HEAD":
+            request_method = "GET"
 
-        method_handler = getattr(
-            self, "_async_render_%s" % (request.method.decode("ascii"),), None
-        )
+        method_handler = getattr(self, "_async_render_%s" % (request_method,), None)
         if method_handler:
             raw_callback_return = method_handler(request)
 
@@ -278,7 +281,7 @@ class DirectServeJsonResource(_AsyncResource):
     """
 
     def _send_response(
-        self, request, code, response_object,
+        self, request: Request, code: int, response_object: Any,
     ):
         """Implements _AsyncResource._send_response
         """
@@ -362,11 +365,15 @@ class JsonResource(DirectServeJsonResource):
             A tuple of the callback to use, the name of the servlet, and the
             key word arguments to pass to the callback
         """
+        # Treat HEAD requests as GET requests.
         request_path = request.path.decode("ascii")
+        request_method = request.method
+        if request_method == b"HEAD":
+            request_method = b"GET"
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
-        for path_entry in self.path_regexs.get(request.method, []):
+        for path_entry in self.path_regexs.get(request_method, []):
             m = path_entry.pattern.match(request_path)
             if m:
                 # We found a match!
@@ -442,21 +449,6 @@ class StaticResource(File):
         return super().render_GET(request)
 
 
-def _options_handler(request):
-    """Request handler for OPTIONS requests
-
-    This is a request handler suitable for return from
-    _get_handler_for_request. It returns a 200 and an empty body.
-
-    Args:
-        request (twisted.web.http.Request):
-
-    Returns:
-        Tuple[int, dict]: http code, response body.
-    """
-    return 200, {}
-
-
 def _unrecognised_request_handler(request):
     """Request handler for unrecognised requests
 
@@ -490,11 +482,12 @@ class OptionsResource(resource.Resource):
     """Responds to OPTION requests for itself and all children."""
 
     def render_OPTIONS(self, request):
-        code, response_json_object = _options_handler(request)
+        request.setResponseCode(204)
+        request.setHeader(b"Content-Length", b"0")
 
-        return respond_with_json(
-            request, code, response_json_object, send_cors=True, canonical_json=False,
-        )
+        set_cors_headers(request)
+
+        return b""
 
     def getChildWithDefault(self, path, request):
         if request.method == b"OPTIONS":
@@ -507,14 +500,29 @@ class RootOptionsRedirectResource(OptionsResource, RootRedirect):
 
 
 def respond_with_json(
-    request,
-    code,
-    json_object,
-    send_cors=False,
-    response_code_message=None,
-    pretty_print=False,
-    canonical_json=True,
+    request: Request,
+    code: int,
+    json_object: Any,
+    send_cors: bool = False,
+    pretty_print: bool = False,
+    canonical_json: bool = True,
 ):
+    """Sends encoded JSON in response to the given request.
+
+    Args:
+        request: The http request to respond to.
+        code: The HTTP response code.
+        json_object: The object to serialize to JSON.
+        send_cors: Whether to send Cross-Origin Resource Sharing headers
+            https://fetch.spec.whatwg.org/#http-cors-protocol
+        pretty_print: Whether to include indentation and line-breaks in the
+            resulting JSON bytes.
+        canonical_json: Whether to use the canonicaljson algorithm when encoding
+            the JSON bytes.
+
+    Returns:
+        twisted.web.server.NOT_DONE_YET if the request is still active.
+    """
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -522,7 +530,7 @@ def respond_with_json(
         logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
-        return
+        return None
 
     if pretty_print:
         json_bytes = encode_pretty_printed_json(json_object) + b"\n"
@@ -531,32 +539,28 @@ def respond_with_json(
             # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = json.dumps(json_object).encode("utf-8")
+            json_bytes = json_encoder.encode(json_object).encode("utf-8")
 
-    return respond_with_json_bytes(
-        request,
-        code,
-        json_bytes,
-        send_cors=send_cors,
-        response_code_message=response_code_message,
-    )
+    return respond_with_json_bytes(request, code, json_bytes, send_cors=send_cors)
 
 
 def respond_with_json_bytes(
-    request, code, json_bytes, send_cors=False, response_code_message=None
+    request: Request, code: int, json_bytes: bytes, send_cors: bool = False,
 ):
     """Sends encoded JSON in response to the given request.
 
     Args:
-        request (twisted.web.http.Request): The http request to respond to.
-        code (int): The HTTP response code.
-        json_bytes (bytes): The json bytes to use as the response body.
-        send_cors (bool): Whether to send Cross-Origin Resource Sharing headers
+        request: The http request to respond to.
+        code: The HTTP response code.
+        json_bytes: The json bytes to use as the response body.
+        send_cors: Whether to send Cross-Origin Resource Sharing headers
             https://fetch.spec.whatwg.org/#http-cors-protocol
-    Returns:
-        twisted.web.server.NOT_DONE_YET"""
 
-    request.setResponseCode(code, message=response_code_message)
+    Returns:
+        twisted.web.server.NOT_DONE_YET if the request is still active.
+    """
+
+    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
@@ -564,8 +568,8 @@ def respond_with_json_bytes(
     if send_cors:
         set_cors_headers(request)
 
-    # todo: we can almost certainly avoid this copy and encode the json straight into
-    # the bytesIO, but it would involve faffing around with string->bytes wrappers.
+    # note that this is zero-copy (the bytesio shares a copy-on-write buffer with
+    # the original `bytes`).
     bytes_io = BytesIO(json_bytes)
 
     producer = NoRangeStaticProducer(request, bytes_io)
@@ -573,16 +577,16 @@ def respond_with_json_bytes(
     return NOT_DONE_YET
 
 
-def set_cors_headers(request):
-    """Set the CORs headers so that javascript running in a web browsers can
+def set_cors_headers(request: Request):
+    """Set the CORS headers so that javascript running in a web browsers can
     use this API
 
     Args:
-        request (twisted.web.http.Request): The http request to add CORs to.
+        request: The http request to add CORS to.
     """
     request.setHeader(b"Access-Control-Allow-Origin", b"*")
     request.setHeader(
-        b"Access-Control-Allow-Methods", b"GET, POST, PUT, DELETE, OPTIONS"
+        b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
     request.setHeader(
         b"Access-Control-Allow-Headers",
@@ -643,7 +647,7 @@ def set_clickjacking_protection_headers(request: Request):
     request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
-def finish_request(request):
+def finish_request(request: Request):
     """ Finish writing the response to the request.
 
     Twisted throws a RuntimeException if the connection closed before the
@@ -662,7 +666,7 @@ def finish_request(request):
         logger.info("Connection disconnected before response was written: %r", e)
 
 
-def _request_user_agent_is_curl(request):
+def _request_user_agent_is_curl(request: Request) -> bool:
     user_agents = request.requestHeaders.getRawHeaders(b"User-Agent", default=[])
     for user_agent in user_agents:
         if b"curl" in user_agent:
