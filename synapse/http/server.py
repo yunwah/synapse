@@ -617,6 +617,8 @@ def respond_with_json(
         )
         return None
 
+    logger.info("Response object: %r", json_object)
+
     if pretty_print:
         encoder = iterencode_pretty_printed_json
     else:
