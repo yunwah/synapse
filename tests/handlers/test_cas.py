@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from synapse.handlers.sso import MappingException
-
 from tests.unittest import HomeserverTestCase
 
 # These are a few constants that are used as config parameters in the tests.
@@ -56,6 +54,31 @@ class CasHandlerTestCase(HomeserverTestCase):
         )
         self.assertEqual(mxid, "@test_user:test")
 
+    def test_map_cas_user_to_existing_user(self):
+        """Existing users can log in with CAS account."""
+        store = self.hs.get_datastore()
+        self.get_success(
+            store.register_user(user_id="@test_user:test", password_hash=None)
+        )
+
+        # Map a user via SSO.
+        cas_user_id = "test_user"
+        display_name = ""
+        mxid = self.get_success(
+            self.handler._map_cas_user_to_matrix_user(
+                cas_user_id, display_name, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user:test")
+
+        # Subsequent calls should map to the same mxid.
+        mxid = self.get_success(
+            self.handler._map_cas_user_to_matrix_user(
+                cas_user_id, display_name, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user:test")
+
     def test_map_cas_user_to_invalid_localpart(self):
         """CAS automaps invalid characters to base-64 encoding."""
         cas_user_id = "föö"
@@ -66,40 +89,3 @@ class CasHandlerTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(mxid, "@f=c3=b6=c3=b6:test")
-
-    def test_map_cas_user_to_user_retries(self):
-        """It can retry generating an MXID if the MXID is already in use."""
-        store = self.hs.get_datastore()
-        self.get_success(
-            store.register_user(user_id="@test_user:test", password_hash=None)
-        )
-        cas_user_id = "test_user"
-        display_name = ""
-        mxid = self.get_success(
-            self.handler._map_cas_user_to_matrix_user(
-                cas_user_id, display_name, "user-agent", "10.10.10.10"
-            )
-        )
-        # test_user is already taken, so test_user1 gets registered instead.
-        self.assertEqual(mxid, "@test_user1:test")
-
-        # Register all of the potential mxids for a particular CAS username.
-        self.get_success(
-            store.register_user(user_id="@tester:test", password_hash=None)
-        )
-        for i in range(1, 3):
-            self.get_success(
-                store.register_user(user_id="@tester%d:test" % i, password_hash=None)
-            )
-
-        # Now attempt to map to a username, this will fail since all potential usernames are taken.
-        cas_user_id = "tester"
-        e = self.get_failure(
-            self.handler._map_cas_user_to_matrix_user(
-                cas_user_id, display_name, "user-agent", "10.10.10.10"
-            ),
-            MappingException,
-        )
-        self.assertEqual(
-            str(e.value), "Unable to generate a Matrix ID from the SSO response"
-        )

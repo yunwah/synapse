@@ -22,7 +22,7 @@ from twisted.web.client import PartialDownloadError
 from synapse.api.errors import Codes, LoginError
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
-from synapse.types import map_username_to_mxid_localpart
+from synapse.types import UserID, map_username_to_mxid_localpart
 
 if TYPE_CHECKING:
     from synapse.app.homeserver import HomeServer
@@ -41,6 +41,7 @@ class CasHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self._hostname = hs.hostname
+        self._store = hs.get_datastore()
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
 
@@ -267,11 +268,31 @@ class CasHandler:
             """
             localpart = map_username_to_mxid_localpart(remote_user_id)
 
-            # Append suffix integer if last call to this function failed to produce
-            # a usable mxid.
-            localpart += str(failures) if failures else ""
+            # Due to the grandfathering logic matching any previously registered
+            # mxids it isn't expected for there to be any failures.
+            if failures:
+                raise RuntimeError("CAS is not expected to de-duplicate Matrix IDs")
 
             return UserAttributes(localpart=localpart, display_name=display_name)
+
+        async def grandfather_existing_users() -> Optional[str]:
+            # Since CAS did not used to support storing data into the user_external_ids
+            # tables, we need to attempt to map to existing users.
+            user_id = UserID(
+                map_username_to_mxid_localpart(remote_user_id), self._hostname
+            ).to_string()
+
+            logger.debug(
+                "Looking for existing account based on mapped %s", user_id,
+            )
+
+            users = await self._store.get_users_by_id_case_insensitive(user_id)
+            if users:
+                registered_user_id = list(users.keys())[0]
+                logger.info("Grandfathering mapping to %s", registered_user_id)
+                return registered_user_id
+
+            return None
 
         return await self._sso_handler.get_mxid_from_sso(
             self._auth_provider_id,
@@ -279,4 +300,5 @@ class CasHandler:
             user_agent,
             ip_address,
             cas_response_to_user_attributes,
+            grandfather_existing_users,
         )
