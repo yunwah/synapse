@@ -20,7 +20,7 @@ from xml.etree import ElementTree as ET
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.errors import Codes, LoginError
-from synapse.handlers.sso import UserAttributes
+from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.types import map_username_to_mxid_localpart
 
@@ -222,9 +222,14 @@ class CasHandler:
         ip_address = self.hs.get_ip_from_request(request)
 
         # Get the matrix ID from the CAS username.
-        user_id = await self._map_cas_user_to_matrix_user(
-            username, user_display_name, user_agent, ip_address
-        )
+        try:
+            user_id = await self._map_cas_user_to_matrix_user(
+                username, user_display_name, user_agent, ip_address
+            )
+        except MappingException as e:
+            logger.exception("Could not map user")
+            self._sso_handler.render_error(request, "mapping_error", str(e))
+            return
 
         # If this not a UI auth request than there must be a redirect URL.
         assert client_redirect_url
