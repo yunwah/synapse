@@ -46,10 +46,10 @@ class CasHandlerTestCase(HomeserverTestCase):
     def test_map_cas_user_to_user(self):
         """Ensure that mapping the CAS user returned from a provider to an MXID works properly."""
         cas_user_id = "test_user"
-        display_name = ""
+        attributes = {}
         mxid = self.get_success(
             self.handler._map_cas_user_to_matrix_user(
-                cas_user_id, display_name, "user-agent", "10.10.10.10"
+                cas_user_id, attributes, "user-agent", "10.10.10.10"
             )
         )
         self.assertEqual(mxid, "@test_user:test")
@@ -63,10 +63,10 @@ class CasHandlerTestCase(HomeserverTestCase):
 
         # Map a user via SSO.
         cas_user_id = "test_user"
-        display_name = ""
+        attributes = {}
         mxid = self.get_success(
             self.handler._map_cas_user_to_matrix_user(
-                cas_user_id, display_name, "user-agent", "10.10.10.10"
+                cas_user_id, attributes, "user-agent", "10.10.10.10"
             )
         )
         self.assertEqual(mxid, "@test_user:test")
@@ -74,7 +74,7 @@ class CasHandlerTestCase(HomeserverTestCase):
         # Subsequent calls should map to the same mxid.
         mxid = self.get_success(
             self.handler._map_cas_user_to_matrix_user(
-                cas_user_id, display_name, "user-agent", "10.10.10.10"
+                cas_user_id, attributes, "user-agent", "10.10.10.10"
             )
         )
         self.assertEqual(mxid, "@test_user:test")
@@ -82,10 +82,10 @@ class CasHandlerTestCase(HomeserverTestCase):
     def test_map_cas_user_to_invalid_localpart(self):
         """CAS automaps invalid characters to base-64 encoding."""
         cas_user_id = "föö"
-        display_name = ""
+        attributes = {}
         mxid = self.get_success(
             self.handler._map_cas_user_to_matrix_user(
-                cas_user_id, display_name, "user-agent", "10.10.10.10"
+                cas_user_id, attributes, "user-agent", "10.10.10.10"
             )
         )
         self.assertEqual(mxid, "@f=c3=b6=c3=b6:test")

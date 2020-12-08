@@ -76,9 +76,9 @@ class CasHandler:
 
     async def _validate_ticket(
         self, ticket: str, service_args: Dict[str, str]
-    ) -> Tuple[str, Optional[str]]:
+    ) -> Tuple[str, Dict[str, Optional[str]]]:
         """
-        Validate a CAS ticket with the server, parse the response, and return the user and display name.
+        Validate a CAS ticket with the server, parse the response, and return the user and other attributes.
 
         Args:
             ticket: The CAS ticket from the client.
@@ -97,22 +97,7 @@ class CasHandler:
             # even if that's being used old-http style to signal end-of-data
             body = pde.response
 
-        user, attributes = self._parse_cas_response(body)
-        displayname = attributes.pop(self._cas_displayname_attribute, None)
-
-        for required_attribute, required_value in self._cas_required_attributes.items():
-            # If required attribute was not in CAS Response - Forbidden
-            if required_attribute not in attributes:
-                raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
-
-            # Also need to check value
-            if required_value is not None:
-                actual_value = attributes[required_attribute]
-                # If required attribute value does not match expected - Forbidden
-                if required_value != actual_value:
-                    raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
-
-        return user, displayname
+        return self._parse_cas_response(body)
 
     def _parse_cas_response(
         self, cas_response_body: bytes
@@ -208,7 +193,7 @@ class CasHandler:
             args["redirectUrl"] = client_redirect_url
         if session:
             args["session"] = session
-        username, user_display_name = await self._validate_ticket(ticket, args)
+        username, attributes = await self._validate_ticket(ticket, args)
 
         # first check if we're doing a UIA
         if session:
@@ -218,6 +203,28 @@ class CasHandler:
 
         # otherwise, we're handling a login request.
 
+        # Ensure that the attributes of the logged in user meet the required
+        # attributes.
+        for required_attribute, required_value in self._cas_required_attributes.items():
+            # If required attribute was not in CAS Response - Forbidden
+            if required_attribute not in attributes:
+                self._sso_handler.render_error(
+                    request, "unauthorised", "You are not authorised to log in here."
+                )
+                return
+
+            # Also need to check value
+            if required_value is not None:
+                actual_value = attributes[required_attribute]
+                # If required attribute value does not match expected - Forbidden
+                if required_value != actual_value:
+                    self._sso_handler.render_error(
+                        request,
+                        "unauthorised",
+                        "You are not authorised to log in here.",
+                    )
+                    return
+
         # Pull out the user-agent and IP from the request.
         user_agent = request.get_user_agent("")
         ip_address = self.hs.get_ip_from_request(request)
@@ -225,7 +232,7 @@ class CasHandler:
         # Get the matrix ID from the CAS username.
         try:
             user_id = await self._map_cas_user_to_matrix_user(
-                username, user_display_name, user_agent, ip_address
+                username, attributes, user_agent, ip_address
             )
         except MappingException as e:
             logger.exception("Could not map user")
@@ -242,7 +249,7 @@ class CasHandler:
     async def _map_cas_user_to_matrix_user(
         self,
         remote_user_id: str,
-        display_name: Optional[str],
+        attributes: Dict[str, Optional[str]],
         user_agent: str,
         ip_address: str,
     ) -> str:
@@ -251,7 +258,7 @@ class CasHandler:
 
         Args:
             remote_user_id: The username from the CAS response.
-            display_name: The display name from the CAS response.
+            attributes: Additional attributes from the CAS response.
             user_agent: The user agent of the client making the request.
             ip_address: The IP address of the client making the request.
 
@@ -262,12 +269,14 @@ class CasHandler:
              The user ID associated with this response.
         """
 
+        # Note that CAS does not support a mapping provider, so the logic is hard-coded.
+        localpart = map_username_to_mxid_localpart(remote_user_id)
+        display_name = attributes.pop(self._cas_displayname_attribute, None)
+
         async def cas_response_to_user_attributes(failures: int) -> UserAttributes:
             """
             Map from CAS attributes to user attributes.
             """
-            localpart = map_username_to_mxid_localpart(remote_user_id)
-
             # Due to the grandfathering logic matching any previously registered
             # mxids it isn't expected for there to be any failures.
             if failures:
@@ -278,9 +287,7 @@ class CasHandler:
         async def grandfather_existing_users() -> Optional[str]:
             # Since CAS did not used to support storing data into the user_external_ids
             # tables, we need to attempt to map to existing users.
-            user_id = UserID(
-                map_username_to_mxid_localpart(remote_user_id), self._hostname
-            ).to_string()
+            user_id = UserID(localpart, self._hostname).to_string()
 
             logger.debug(
                 "Looking for existing account based on mapped %s", user_id,
