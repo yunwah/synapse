@@ -23,9 +23,9 @@ jobs:
       - setup_remote_docker
       - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - docker_build:
-          tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64
+#      - docker_build:
+#          tag: -t matrixdotorg/synapse:latest
+#          platforms: linux/amd64
       - docker_build:
           tag: -t matrixdotorg/synapse:latest
           platforms: linux/amd64,linux/arm/v7,linux/arm64
@@ -40,9 +40,9 @@ workflows:
             branches:
               ignore: /.*/
       - dockerhubuploadlatest:
-          filters:
-            branches:
-              only: master
+#          filters:
+#            branches:
+#             only: master
 
 commands:
   docker_prepare:
@@ -72,4 +72,4 @@ commands:
       tag:
         type: string
     steps:
-      - run: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> --label gitsha1=${CIRCLE_SHA1} << parameters.tag >> --progress=plain .
+      - run: docker buildx build -f docker/Dockerfile --platform << parameters.platforms >> --label gitsha1=${CIRCLE_SHA1} << parameters.tag >> --progress=plain .
