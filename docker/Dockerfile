@@ -18,14 +18,8 @@ ARG PYTHON_VERSION=3.8
 ###
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
-RUN if [ `uname -m` = 'x86_64' ]; then sleep 1000; fi
-
-RUN apt-get update
-
-#RUN apt-get update && apt-get install -y binutils
-
 # install the OS build deps
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     build-essential \
     libffi-dev \
     libjpeg-dev \
@@ -65,8 +59,6 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 ###
 
 FROM docker.io/python:${PYTHON_VERSION}-slim
-
-COPY --from=builder /install /usr/local
 
 RUN apt-get update && apt-get install -y \
     curl \
