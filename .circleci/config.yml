@@ -20,14 +20,12 @@ jobs:
       - image: docker:git
     steps:
       - checkout
-      - run: echo $DOCKER_HOST
       - setup_remote_docker
-      - run: echo $DOCKER_HOST
       - docker_prepare
-      - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - docker_build:
-          tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64
+      # - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
+      #- docker_build:
+      #    tag: -t matrixdotorg/synapse:latest
+      #    platforms: linux/amd64
       - docker_build:
           tag: -t matrixdotorg/synapse:latest
           platforms: linux/amd64,linux/arm/v7,linux/arm64
