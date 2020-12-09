@@ -21,7 +21,9 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 RUN type dpkg-deb
 
 RUN apt-get update && type dpkg-deb && apt-get install -y \
-    build-essential
+    build-essential || true
+
+RUN type dpkg-deb
 
 # install the OS build deps
 RUN apt-get update && type dpkg-deb && apt-get install -y \
