@@ -18,10 +18,10 @@ ARG PYTHON_VERSION=3.8
 ###
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
-RUN which dpkg-deb
+RUN type dpkg-deb
 
 # install the OS build deps
-RUN apt-get update && which dpkg-deb && papt-get install -y \
+RUN apt-get update && type dpkg-deb && apt-get install -y \
     build-essential \
     libffi-dev \
     libjpeg-dev \
