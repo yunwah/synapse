@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y \
 
 RUN dpkg-deb --version
 
+RUN [ `uname -m` == 'x86_64' ] && sleep 1000
+
 # install the OS build deps
 RUN apt-get update && type dpkg-deb && apt-get install -y \
     build-essential \
