@@ -20,7 +20,9 @@ jobs:
       - image: docker:git
     steps:
       - checkout
+      - echo $DOCKER_HOST
       - setup_remote_docker
+      - echo $DOCKER_HOST
       - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
 #      - docker_build:
