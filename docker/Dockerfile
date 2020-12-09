@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN dpkg-deb --version
 
-RUN [ `uname -m` == 'x86_64' ] && sleep 1000
+RUN if [ `uname -m` = 'x86_64' ]; then sleep 1000; fi
 
 # install the OS build deps
 RUN apt-get update && type dpkg-deb && apt-get install -y \
