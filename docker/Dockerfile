@@ -19,7 +19,7 @@ ARG PYTHON_VERSION=3.8
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 RUN apt-get update && apt-get install -y \
-    build-essential \
+    build-essential
 
 
 # install the OS build deps
@@ -63,6 +63,8 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 ###
 
 FROM docker.io/python:${PYTHON_VERSION}-slim
+
+COPY --from=builder /install /usr/local
 
 RUN apt-get update && apt-get install -y \
     curl \
