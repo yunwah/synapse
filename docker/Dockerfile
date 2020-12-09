@@ -18,10 +18,9 @@ ARG PYTHON_VERSION=3.8
 ###
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
-#RUN apt-get update && apt-get install -y \
-#    build-essential || true
-
 RUN if [ `uname -m` = 'x86_64' ]; then sleep 1000; fi
+
+RUN apt-get update && apt-get install -y bintools
 
 # install the OS build deps
 RUN apt-get update && type dpkg-deb && apt-get install -y \
