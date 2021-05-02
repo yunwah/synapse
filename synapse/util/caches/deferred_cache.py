@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -105,7 +104,7 @@ class DeferredCache(Generic[KT, VT]):
             keylen=keylen,
             cache_name=name,
             cache_type=cache_type,
-            size_callback=(lambda d: len(d)) if iterable else None,
+            size_callback=(lambda d: len(d) or 1) if iterable else None,
             metrics_collection_callback=metrics_cb,
             apply_cache_factor_from_config=apply_cache_factor_from_config,
         )  # type: LruCache[KT, VT]
@@ -283,7 +282,9 @@ class DeferredCache(Generic[KT, VT]):
         # we return a new Deferred which will be called before any subsequent observers.
         return observable.observe()
 
-    def prefill(self, key: KT, value: VT, callback: Callable[[], None] = None):
+    def prefill(
+        self, key: KT, value: VT, callback: Optional[Callable[[], None]] = None
+    ):
         callbacks = [callback] if callback else []
         self.cache.set(key, value, callbacks=callbacks)
 
